@@ -72,7 +72,7 @@ jobs:
 
       # 运行构建脚本
       - name: Run Build Script
-        run: npm run build
+        run: npm run docs:build
 
       # 部署到 GitHub Pages
       - name: Deploy to GitHub Pages
@@ -80,7 +80,7 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           # 要部署的文件夹，必填
-          FOLDER: src/.vuepress/dist
+          FOLDER: docs/.vuepress/dist
           # 希望部署的分支，默认gh-pages
           BRANCH: gh-pages
           # # 仓库范围的访问令牌，可以将个人令牌的值存储在GitHub Secrets中
