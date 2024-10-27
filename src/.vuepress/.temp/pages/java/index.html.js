@@ -1,3 +1,16 @@
-import comp from "F:/code_project/VueProject/blog/blog/src/.vuepress/.temp/pages/java/index.html.vue"
-const data = JSON.parse("{\"path\":\"/java/\",\"title\":\"JAVA\",\"lang\":\"zh-CN\",\"frontmatter\":{\"title\":\"JAVA\",\"index\":false,\"icon\":\"/assets/icon/java.png\",\"category\":[\"使用指南1\"],\"head\":[[\"meta\",{\"property\":\"og:url\",\"content\":\"https://mister-hope.github.io/blog/java/\"}],[\"meta\",{\"property\":\"og:site_name\",\"content\":\"博客演示\"}],[\"meta\",{\"property\":\"og:title\",\"content\":\"JAVA\"}],[\"meta\",{\"property\":\"og:type\",\"content\":\"article\"}],[\"meta\",{\"property\":\"og:locale\",\"content\":\"zh-CN\"}],[\"meta\",{\"property\":\"og:updated_time\",\"content\":\"2024-10-24T15:59:43.000Z\"}],[\"meta\",{\"property\":\"article:modified_time\",\"content\":\"2024-10-24T15:59:43.000Z\"}],[\"script\",{\"type\":\"application/ld+json\"},\"{\\\"@context\\\":\\\"https://schema.org\\\",\\\"@type\\\":\\\"Article\\\",\\\"headline\\\":\\\"JAVA\\\",\\\"image\\\":[\\\"\\\"],\\\"dateModified\\\":\\\"2024-10-24T15:59:43.000Z\\\",\\\"author\\\":[{\\\"@type\\\":\\\"Person\\\",\\\"name\\\":\\\"Mr.Hope\\\",\\\"url\\\":\\\"https://mister-hope.com\\\"}]}\"]]},\"headers\":[],\"git\":{\"createdTime\":1729785583000,\"updatedTime\":1729785583000,\"contributors\":[{\"name\":\"bigshcool\",\"email\":\"990194923@qq.com\",\"commits\":1}]},\"readingTime\":{\"minutes\":0.05,\"words\":14},\"filePathRelative\":\"java/README.md\",\"localizedDate\":\"2024年10月24日\",\"excerpt\":\"\"}")
+import comp from "D:/code/gitcode/blog/src/.vuepress/.temp/pages/java/index.html.vue"
+const data = JSON.parse("{\"path\":\"/java/\",\"title\":\"JAVA\",\"lang\":\"zh-CN\",\"frontmatter\":{\"title\":\"JAVA\",\"index\":false,\"icon\":\"/assets/icon/java.png\",\"category\":[\"使用指南1\"],\"gitInclude\":[],\"head\":[[\"meta\",{\"property\":\"og:url\",\"content\":\"https://mister-hope.github.io/blog/java/\"}],[\"meta\",{\"property\":\"og:site_name\",\"content\":\"博客演示\"}],[\"meta\",{\"property\":\"og:title\",\"content\":\"JAVA\"}],[\"meta\",{\"property\":\"og:type\",\"content\":\"article\"}],[\"meta\",{\"property\":\"og:locale\",\"content\":\"zh-CN\"}],[\"script\",{\"type\":\"application/ld+json\"},\"{\\\"@context\\\":\\\"https://schema.org\\\",\\\"@type\\\":\\\"Article\\\",\\\"headline\\\":\\\"JAVA\\\",\\\"image\\\":[\\\"\\\"],\\\"dateModified\\\":null,\\\"author\\\":[{\\\"@type\\\":\\\"Person\\\",\\\"name\\\":\\\"Mr.Hope\\\",\\\"url\\\":\\\"https://mister-hope.com\\\"}]}\"]]},\"headers\":[],\"readingTime\":{\"minutes\":0.05,\"words\":14},\"filePathRelative\":\"java/README.md\",\"excerpt\":\"\"}")
 export { comp, data }
+
+if (import.meta.webpackHot) {
+  import.meta.webpackHot.accept()
+  if (__VUE_HMR_RUNTIME__.updatePageData) {
+    __VUE_HMR_RUNTIME__.updatePageData(data)
+  }
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(({ data }) => {
+    __VUE_HMR_RUNTIME__.updatePageData(data)
+  })
+}

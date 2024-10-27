@@ -1,11 +1,11 @@
-import { hasGlobalComponent } from "F:/code_project/VueProject/blog/blog/node_modules/@vuepress/helper/lib/client/index.js";
+import { hasGlobalComponent } from "D:/code/gitcode/blog/node_modules/@vuepress/helper/lib/client/index.js";
 
-import { useScriptTag } from "F:/code_project/VueProject/blog/blog/node_modules/@vueuse/core/index.mjs";
-import FontIcon from "F:/code_project/VueProject/blog/blog/node_modules/vuepress-plugin-components/lib/client/components/FontIcon.js";
-import Badge from "F:/code_project/VueProject/blog/blog/node_modules/vuepress-plugin-components/lib/client/components/Badge.js";
-import VPCard from "F:/code_project/VueProject/blog/blog/node_modules/vuepress-plugin-components/lib/client/components/VPCard.js";
+import { useScriptTag } from "D:/code/gitcode/blog/node_modules/@vueuse/core/index.mjs";
+import FontIcon from "D:/code/gitcode/blog/node_modules/vuepress-plugin-components/lib/client/components/FontIcon.js";
+import Badge from "D:/code/gitcode/blog/node_modules/vuepress-plugin-components/lib/client/components/Badge.js";
+import VPCard from "D:/code/gitcode/blog/node_modules/vuepress-plugin-components/lib/client/components/VPCard.js";
 
-import "F:/code_project/VueProject/blog/blog/node_modules/vuepress-plugin-components/lib/client/styles/sr-only.scss";
+import "D:/code/gitcode/blog/node_modules/vuepress-plugin-components/lib/client/styles/sr-only.scss";
 
 export default {
   enhance: ({ app }) => {

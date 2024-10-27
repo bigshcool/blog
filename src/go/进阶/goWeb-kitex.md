@@ -1,12 +1,12 @@
 ---
 # 这是文章的标题
-title: Go基础语法
+title: Kitex
 # 你可以自定义封面图片
 cover: /assets/images/cover1.jpg
 # 这是页面的图标
 icon: file
 # 这是侧边栏的顺序
-order: 1
+order: 2
 # 设置作者
 author: RUAN LONG
 # 设置写作时间

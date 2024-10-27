@@ -1,3 +1,16 @@
-import comp from "F:/code_project/VueProject/blog/blog/src/.vuepress/.temp/pages/demo/encrypt.html.vue"
-const data = JSON.parse("{\"path\":\"/demo/encrypt.html\",\"title\":\"密码加密的文章\",\"lang\":\"zh-CN\",\"frontmatter\":{\"icon\":\"lock\",\"category\":[\"使用指南\"],\"tag\":[\"加密\"],\"feed\":false,\"seo\":false,\"head\":[]},\"headers\":[],\"git\":{\"createdTime\":1729785583000,\"updatedTime\":1729785583000,\"contributors\":[{\"name\":\"bigshcool\",\"email\":\"990194923@qq.com\",\"commits\":1}]},\"readingTime\":{\"minutes\":0.51,\"words\":154},\"filePathRelative\":\"demo/encrypt.md\",\"localizedDate\":\"2024年10月24日\"}")
+import comp from "D:/code/gitcode/blog/src/.vuepress/.temp/pages/demo/encrypt.html.vue"
+const data = JSON.parse("{\"path\":\"/demo/encrypt.html\",\"title\":\"密码加密的文章\",\"lang\":\"zh-CN\",\"frontmatter\":{\"icon\":\"lock\",\"category\":[\"使用指南\"],\"tag\":[\"加密\"],\"feed\":false,\"seo\":false,\"gitInclude\":[],\"head\":[]},\"headers\":[],\"readingTime\":{\"minutes\":0.51,\"words\":154},\"filePathRelative\":\"demo/encrypt.md\"}")
 export { comp, data }
+
+if (import.meta.webpackHot) {
+  import.meta.webpackHot.accept()
+  if (__VUE_HMR_RUNTIME__.updatePageData) {
+    __VUE_HMR_RUNTIME__.updatePageData(data)
+  }
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(({ data }) => {
+    __VUE_HMR_RUNTIME__.updatePageData(data)
+  })
+}
