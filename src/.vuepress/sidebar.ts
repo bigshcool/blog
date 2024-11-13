@@ -14,4 +14,5 @@ export default sidebar({
   "/posts/": "structure",
   "/java/": "structure",
   "/go/": "structure",
+  "/data/": "structure",
 });

@@ -46,9 +46,5 @@ export default navbar([
   },
   '/java/',
   '/go/',
-  {
-    text: "数据",
-    icon: "/assets/icon/data.png",
-    link: "https://theme-hope.vuejs.press/zh/",
-  },
+  '/data/'
 ]);
