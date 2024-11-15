@@ -305,6 +305,7 @@ ClickHouse 提供了多种字段类型扩展，例如 Array、Tuple 等结合基
 #### 3.1.2 LOG
 Log 与 TinyLog 的不同之处在于，«标记» 的小文件与列文件存在一起。这些标记写在每个数据块上，并且包含偏移量，这些偏移量指示从哪里开始读取文件以便跳过指定的行数。这使得可以在多个线程中读取表数据。对于并发数据访问，可以同时执行读取操作，而写入操作则阻塞读取和其它写入。Log引擎不支持索引。同样，如果写入表失败，则该表将被破坏，并且从该表读取将返回错误。Log引擎适用于临时数据，write-once 表以及测试或演示目的。
 
+
 ### 3.2 **合并树引擎(MergeTree)**
 
 Clickhouse 中最强大的表引擎当属 MergeTree （合并树）引擎及该系列（*MergeTree）中的其他引擎。
@@ -361,6 +362,7 @@ PRIMARY KEY：
 影响稀疏索引：PRIMARY KEY 会影响 稀疏索引 的构建，ClickHouse 会为每个数据块存储 PRIMARY KEY 列的部分值，以加速查找操作。每个数据块会保存该列的某些索引值，并指向包含这些值的具体位置。索引是基于数据块的级别，而不是单个行级别。每个数据块内只存储一部分的索引数据。
 
 ORDER BY：
+
 影响数据的物理顺序：ORDER BY 决定了数据如何在磁盘 上按顺序存储，这不仅影响磁盘的存储布局，还影响查询时的读取效率。数据在存储时是按照 ORDER BY 的列排序的。在查询时，ClickHouse可以利用数据的物理顺序进行范围查询（如 BETWEEN、>、< 等）时提高效率，因为数据已经按 ORDER BY 列的顺序存储。
 :::
 
@@ -374,3 +376,153 @@ ORDER BY：
 - 并行
   分区后，面对涉及跨分区的查询统计，ClickHouse会以分区为单位并行处理
 - 数据写入与分区合并
+
+在 ClickHouse 中，数据存储是通过不同的文件夹和文件来管理的，文件夹主要用于存放不同的数据表、分区、以及数据块等。重点就是/var/lib/clickhouse/
+
+::: tip /var/lib/clickhouse 文件目录
+/var/lib/clickhouse/
+
+├── metadata/             # 存储数据库和表的元数据
+
+├── data/                 # 存储实际的表数据和分区数据
+
+├── tmp/                  # 临时文件目录，用于中间数据和临时操作
+
+├── system/               # 系统表和系统相关的数据
+
+└── logs/                 # 日志文件
+:::
+
+::: tip /var/lib/clickhouse/data/
+/var/lib/clickhouse/data/ 目录文件
+
+├── default/              # 数据库文件夹，默认数据库
+
+├── test_db/              # 示例数据库
+
+└── another_db/           # 其他数据库
+:::
+
+- 数据库目录下的表分区目录
+
+当你在某个数据库下创建表并定义了分区键（通常是 Date 或类似的字段）时，ClickHouse 会将表数据按分区存储到数据库目录下。例如：
+
+``` bash
+/var/lib/clickhouse/data/default/my_table/2024-01/
+```
+
+上述路径中的 default 是数据库名，my_table 是表名，**2024-01** 是分区名。如果我们以日期分区，则 2024-01 代表的是 2024 年 1 月的数据。
+
+- 分区目录的结构
+每个分区目录下会存储多个 数据块（Part）。每个数据块又包含多个文件。一个典型的分区目录结构如下：
+
+``` yml
+/var/lib/clickhouse/data/default/my_table/2024-01/
+├── 2024-01_1_10_0/   # 数据块1
+├── 2024-01_11_20_1/  # 数据块2
+└── 2024-01_21_30_2/  # 数据块3
+```
+这里每个数据块（如 2024-01_1_10_0）表示一个数据块，它有一个命名规则：
+
+- 分区值（Partition Value）：2024-01
+- 最小编号（Min Part Number）：1
+- 最大编号（Max Part Number）：10
+- 合并层次（Merge Level）：0
+
+::: tip 数据块文件目录
+在每个分区的 Part 目录下，会包含以下几类重要的文件：
+
+- primary.idx：主数据索引文件
+- data.mrk：数据块标记文件
+- column1.bin, column2.bin 等：列数据文件
+- checksums.txt：校验和文件
+- part.txt：数据块元数据文件
+:::
+
+::: tip 数据写入是直接写入实际分区吗？
+任何一个批次的数据写入都会产生一个临时分区，不会纳入一个已有的分区。写入后的某个时刻，ClickHouse会自动执行合并操作，将临时分区的数据，合并到已经有的分区当中
+:::
+
+
+
+#### 3.2.2  详解Primary key主键
+
+ClickHouse 中的 Primary Key：与传统关系型数据库不同，ClickHouse 中的 Primary Key 并不会强制保证字段的唯一性。它实际上只是 提供了一个数据的一级索引，用于优化查询性能，特别是针对基于该字段进行范围查询的情况。在 ClickHouse 中，Primary Key 主要用于 排序数据，而不是约束数据的唯一性。因此，多个相同的 Primary Key 值是可以存在的。它只是帮助数据库更高效地存储和检索数据。
+
+::: tip 为什么ClickHouse 允许设置重复的健
+
+ClickHouse 是一个列式数据库，设计时主要用于大规模数据的快速分析，而不是 OLTP（在线事务处理）。因此，它的目标是高效的数据压缩、查询性能和扩展性，而不是严格的数据完整性。
+
+数据合并与分区：ClickHouse 通过 合并操作 和 分区 来处理重复的数据。多个具有相同 Primary Key 值的记录可以并存，直到它们被合并为一个合适的数据块（Part）时，重复数据才会被合并、优化。
+
+例如，如果有多个相同 user_id 的记录，它们会在存储时被分为不同的数据块，直到合并操作将它们合并成一个块。
+查询优化：虽然主键不强制唯一性，但由于 ClickHouse 根据主键字段对数据进行排序，它依然能在查询时使用主键来加速数据检索，特别是对于范围查询（例如时间范围）非常高效。
+
+:::
+
+在 ClickHouse 中，**index granularity** 是一个非常重要的概念，它涉及到如何在表中存储和管理索引，以及如何通过这种索引来优化查询性能。
+**index granularity（索引粒度）定义了在 MergeTree 存储引擎中数据块（Part） 中，存储多少行数据的间隔会创建一个索引项。简单来说，它决定了每个 索引项 覆盖多少行数据**。index granularity 直接决定了这些索引的密度，也就是说，它控制了每个数据块内记录的索引项数。具体地说，ClickHouse 会在每隔 index granularity 行的地方为该行生成一个索引项。默认值是8192
+
+::: tip index granularity 的作用
+
+1. 影响查询性能
+
+index granularity 对查询性能有直接影响，特别是当查询涉及到范围扫描时。较小的 index granularity 会生成更多的索引项，从而使得查询可以跳过更多不相关的数据块，减少磁盘 I/O。但较小的粒度会带来更多的内存消耗，因为需要更多的索引项来查找数据。
+
+较大的 index granularity 会减少索引项的数量，降低内存占用，但可能导致查询时跳过的数据块更多，从而增加了查询的响应时间，因为需要更频繁地进行磁盘访问。
+
+2. 影响磁盘空间
+
+较小的 index granularity 会生成更多的索引项，导致索引占用更多的磁盘空间。相比之下，较大的 index granularity 会生成更少的索引项，因此索引本身所占的磁盘空间较少。
+
+3. 影响数据合并操作
+
+在进行数据合并时，index granularity 也会影响合并的效率。较大的 index granularity 会使得数据合并时涉及到的索引项较少，从而可能提高合并操作的效率，减少合并过程中对磁盘和内存的压力。
+
+:::
+
+
+#### 3.2.3  详解ORDER BY
+order by 设定了分区内的数据按照那些字段顺序进行有序保存。
+order by 是MergeTree中唯一一个必填项，甚至比primary key还重要，因为当用户不设置主键的情况，很多处理会依照order by进行处理。
+<font color= 'red'>主键要求是order by字段的前缀字段。</font>
+比如order by 字段是(id, sku_id)，那么主键必须是id或者(id, sku_id)
+
+#### 3.2.4 Skip Indexes (二级索引效果)
+Skip Indexes 是一种优化查询性能的机制，它用于加速范围查询。虽然它主要用于主键字段，但它可以间接用于实现某种程度的二级索引效果。Skip Indexes 基于数据块的结构，存储了每个数据块的最小/最大值，从而加速查询过程中不需要扫描整个数据块的过程。
+
+例如，ClickHouse 的主键通常会创建 Skip Index，可以加速按主键查询的速度。
+
+### 3.3 ReplaceingMergeTress
+
+在 ClickHouse 中，ReplacingMergeTree 是从 MergeTree 引擎派生出的特殊引擎，旨在处理 去重 操作。它特别适用于数据中可能存在重复记录的场景，并且希望在后台合并操作时自动删除重复数据。
+
+ReplacingMergeTree 的关键特性
+- 自动去重：当数据插入到 ReplacingMergeTree 表时，ClickHouse 会在后台合并操作中确保去重（基于order by作为唯一键），去重的时机不保证，因为是在分区合并的时候才会去重，**所以只能保障最终一致性**。
+- 版本控制：它支持版本机制，允许更新的数据“替换”旧的数据，确保只保留每个唯一键的最新数据。
+- 高效的数据合并：数据合并在后台进行，合并操作会清理旧的重复数据。
+- 无需显式删除：你无需手动删除重复数据，ClickHouse 会在数据合并时自动处理。
+
+::: tip 去重
+- 实际上是使用order by 字段作为唯一键
+- 去重不能跨分区
+- 只有分区合并后才会进行去重
+- 认定重复的数据保留，版本字段值最大的。
+- 如果版本字段相同则按插入顺序保留最后一笔。
+:::
+
+``` sql 创建表示例
+CREATE TABLE user_activity
+(
+    user_id Int32,
+    activity_type String,
+    activity_time DateTime, -- 活动时间戳
+    version DateTime         -- 版本，使用时间戳表示最新记录
+)
+ENGINE = ReplacingMergeTree(version)
+ORDER BY (user_id, activity_time);
+```
+<font color = 'blue'> ReplacingMergeTree填入的参数为版本字段，重复数据版本字段值最大的。如果不填版本字段，默认按照插入顺序保留最后一条 </font >
+
+### 3.4 SummingMergeTree
+  对于不查询明细，只关心以维度进行汇总
