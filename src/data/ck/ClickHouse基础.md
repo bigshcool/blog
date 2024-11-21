@@ -526,3 +526,139 @@ ORDER BY (user_id, activity_time);
 
 ### 3.4 SummingMergeTree
   对于不查询明细，只关心以维度进行汇总
+
+- 按主键聚合：
+  - 它会根据主键对具有相同键值的数据进行求和。
+  - 聚合仅发生在后台分区合并时，而不是数据插入时。
+非分区范围的限制：
+  - 聚合操作只在分区内生效，跨分区的记录不会自动聚合。例如，如果两个分区中分别存在相同的主键值，这些数据不会被自动合并。
+非数值字段行为：
+  - 对于非数值类型的列，SummingMergeTree 默认会保留分区内的第一个出现的值，而不是做特殊处理。
+
+::: tip  SummingMergeTree 局限点
+- 聚合仅在后台合并时生效：
+  - 数据插入时不会立即触发聚合，因此在查询插入后但合并之前的数据时，可能会看到未聚合的原始数据。
+
+- 跨分区聚合的局限性：
+  - 如果需要对全局范围内的数据进行求和，仍需在查询时使用 GROUP BY，而不能完全依赖表引擎。
+
+- 适用场景受限：
+  - 仅适用于 简单的加和操作，对于复杂的聚合需求（如平均值、最大值、计数等），需要其他方式来实现。
+  - 由于聚合范围受分区限制，在大多数分布式场景下，效果并不显著。
+
+- 对实时性支持不佳：
+  - 聚合依赖后台的分区合并，这一过程可能是非实时的，因此实时性要求较高的场景并不适合。
+
+:::
+
+<font color = 'blue'> 设计聚合表的话，唯一键值，流水号去掉，所有字段全部都是维度、度量、或者时间戳 </font>
+
+## 4. SQL操作
+
+<font color = 'blue'> 基本与标准的SQL(MySQL)基本一致.</font>
+
+### 4.1 插入
+- 基本插入
+``` sql 
+-- 模板
+insert into [table_name] values(...), (...)
+-- 实例
+INSERT INTO my_table (id, name, age) VALUES 
+(2, 'Bob', 25), 
+(3, 'Charlie', 28);
+```
+- 从表到表的插入
+``` sql
+-- 模板
+insert into [table_name] select a,b,c from [table_name_2]
+-- 实例
+INSERT INTO another_table SELECT * FROM my_table WHERE age > 25;
+
+```
+
+### 4.2 Update和Delete
+ClickHouse提供了Delete和Update的能力，这类操作被称为Mutation查询，它可以看作Alter一种。
+
+虽然可以实现修改和删除，但是和一般的OLTP数据库不一样，**Mutation语句是一种很重的操作，并且不支持事务**。
+
+<font color = 'blue'>
+"重"的原因主要是每次修改或者删除都要导致放弃目标数据的原有分区，重建新分区。所以尽量做批量的变更，不要进行频繁小数据的操作。
+</font>
+- 删除
+```
+alter table t_order_smt delete where sku_id = 'sku_001'
+```
+- 操作修改
+```
+alter table t_order_smt update total_amount=toDecimal32(2000.02, 2) where id = 102;
+```
+由于操作比较“重”，所以Mutation语句分两步执行，同步执行的部分其实只是进行新增数据新增分区和并把就分区打上逻辑上失效标记（**相当于生成一个临时分区，将老的分区重新写了一遍**）。直到触发分区合并的时候，才会删除旧数据释放磁盘空间，一般不会开放这样的功能给用户，由管理员完成。
+
+- 查询操作
+  - 支持子查询
+  - 支持CTE(Common Table Eepresion 公用表达式 with 子句)
+  - 支持各种JOIN, 但是JOIN操作无法使用缓存，所以即便是两次相同得JOIN语句，ClickHouse也会视为两条新SQL
+  - 窗口函数(官方正在测试中...)
+  - 不支持自定义函数
+  - GROUP BY 操作增加了 with rollup \ with cube \ with total用来计算小计和总计
+    假设维度是(a, b)
+    - rollup：上卷
+      - group by
+      - group by a
+      - group by a, b
+    - cube: 多维卷积
+      - group by a, b
+      - group by a
+      - group by b
+      - group by 
+    - total：总计
+      - group by  a, b
+      - group by  
+
+### 4.3 alter操作
+同MYSQL的修改字段基本一致
+- 新增字段
+``` sql
+alter table tableName add column newcolname String after col1;
+```
+- 修改字段类型
+``` sql
+alter table tableName modify column newcolname String
+```
+- 删除字段
+
+``` sql
+alter table tableName drop column newcolname;
+```
+
+## 5. 副本
+
+副本的目的主要是保障数据的高可用性，即便一台ClickHouse节点宕机，那么也可以从其他服务器获得相同的数据。
+
+### 5.1 副本写入流程
+
+![**副本写入流程**](./image/write-replica.png)
+
+ClickHouse 的 副本模式 确实没有传统数据库中严格意义上的 "主从" 概念，它采用了多主复制机制，所有副本在逻辑上是平等的。
+
+::: tip 无固定主从设计的优势和挑战
+- 优势
+  - 高可用性
+    - 任意副本都可以处理查询，单个节点故障不会影响整体服务。
+    - 无需主从切换逻辑，减少复杂性。
+  - 负载均衡
+    - 查询可以分散到多个副本，提高读性能。
+    - 所有副本都能参与分布式查询计划。
+  - 灵活性
+    - 任意副本可以动态加入或退出，不需要重新选举 "主副本"。
+- 挑战
+  - 写冲突
+  - 一致性延迟
+  - 运维复杂性
+:::
+
+### 5.2 配置步骤
+
+
+|文本|	打标人 (label)|	审核状态|	最终标签
+|天气很清凉|	小明，小张|	打标中|	|

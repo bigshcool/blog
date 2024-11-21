@@ -481,6 +481,173 @@ order by 是MergeTree中唯一一个必填项，甚至比primary key还重要，
 <span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">ORDER BY</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> (user_id, activity_time);</span></span></code></pre>
 <div class="line-numbers" aria-hidden="true" style="counter-reset:line-number 0"><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div></div></div><font color = 'blue'> ReplacingMergeTree填入的参数为版本字段，重复数据版本字段值最大的。如果不填版本字段，默认按照插入顺序保留最后一条 </font ><h3 id="_3-4-summingmergetree" tabindex="-1"><a class="header-anchor" href="#_3-4-summingmergetree"><span>3.4 SummingMergeTree</span></a></h3>
 <p>对于不查询明细，只关心以维度进行汇总</p>
+<ul>
+<li>按主键聚合：
+<ul>
+<li>它会根据主键对具有相同键值的数据进行求和。</li>
+<li>聚合仅发生在后台分区合并时，而不是数据插入时。
+非分区范围的限制：</li>
+<li>聚合操作只在分区内生效，跨分区的记录不会自动聚合。例如，如果两个分区中分别存在相同的主键值，这些数据不会被自动合并。
+非数值字段行为：</li>
+<li>对于非数值类型的列，SummingMergeTree 默认会保留分区内的第一个出现的值，而不是做特殊处理。</li>
+</ul>
+</li>
+</ul>
+<div class="hint-container tip">
+<p class="hint-container-title">SummingMergeTree 局限点</p>
+<ul>
+<li>
+<p>聚合仅在后台合并时生效：</p>
+<ul>
+<li>数据插入时不会立即触发聚合，因此在查询插入后但合并之前的数据时，可能会看到未聚合的原始数据。</li>
+</ul>
+</li>
+<li>
+<p>跨分区聚合的局限性：</p>
+<ul>
+<li>如果需要对全局范围内的数据进行求和，仍需在查询时使用 GROUP BY，而不能完全依赖表引擎。</li>
+</ul>
+</li>
+<li>
+<p>适用场景受限：</p>
+<ul>
+<li>仅适用于 简单的加和操作，对于复杂的聚合需求（如平均值、最大值、计数等），需要其他方式来实现。</li>
+<li>由于聚合范围受分区限制，在大多数分布式场景下，效果并不显著。</li>
+</ul>
+</li>
+<li>
+<p>对实时性支持不佳：</p>
+<ul>
+<li>聚合依赖后台的分区合并，这一过程可能是非实时的，因此实时性要求较高的场景并不适合。</li>
+</ul>
+</li>
+</ul>
+</div>
+<font color = 'blue'> 设计聚合表的话，唯一键值，流水号去掉，所有字段全部都是维度、度量、或者时间戳 </font><h2 id="_4-sql操作" tabindex="-1"><a class="header-anchor" href="#_4-sql操作"><span>4. SQL操作</span></a></h2>
+<font color = 'blue'> 基本与标准的SQL(MySQL)基本一致.</font><h3 id="_4-1-插入" tabindex="-1"><a class="header-anchor" href="#_4-1-插入"><span>4.1 插入</span></a></h3>
+<ul>
+<li>基本插入</li>
+</ul>
+<div class="language-sql line-numbers-mode" data-highlighter="shiki" data-ext="sql" data-title="sql" style="--shiki-light:#383A42;--shiki-dark:#abb2bf;--shiki-light-bg:#FAFAFA;--shiki-dark-bg:#282c34"><pre v-pre class="shiki shiki-themes one-light one-dark-pro vp-code"><code><span class="line"><span style="--shiki-light:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">-- 模板</span></span>
+<span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">insert into</span><span style="--shiki-light:#383A42;--shiki-dark:#E06C75"> [table_name]</span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD"> values</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">(...), (...)</span></span>
+<span class="line"><span style="--shiki-light:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">-- 实例</span></span>
+<span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">INSERT INTO</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> my_table (id, </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">name</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">, age) </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">VALUES</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> </span></span>
+<span class="line"><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">(</span><span style="--shiki-light:#986801;--shiki-dark:#D19A66">2</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">, </span><span style="--shiki-light:#50A14F;--shiki-dark:#98C379">'Bob'</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">, </span><span style="--shiki-light:#986801;--shiki-dark:#D19A66">25</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">), </span></span>
+<span class="line"><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">(</span><span style="--shiki-light:#986801;--shiki-dark:#D19A66">3</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">, </span><span style="--shiki-light:#50A14F;--shiki-dark:#98C379">'Charlie'</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">, </span><span style="--shiki-light:#986801;--shiki-dark:#D19A66">28</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">);</span></span></code></pre>
+<div class="line-numbers" aria-hidden="true" style="counter-reset:line-number 0"><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div></div></div><ul>
+<li>从表到表的插入</li>
+</ul>
+<div class="language-sql line-numbers-mode" data-highlighter="shiki" data-ext="sql" data-title="sql" style="--shiki-light:#383A42;--shiki-dark:#abb2bf;--shiki-light-bg:#FAFAFA;--shiki-dark-bg:#282c34"><pre v-pre class="shiki shiki-themes one-light one-dark-pro vp-code"><code><span class="line"><span style="--shiki-light:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">-- 模板</span></span>
+<span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">insert into</span><span style="--shiki-light:#383A42;--shiki-dark:#E06C75"> [table_name]</span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD"> select</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> a,b,c </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">from</span><span style="--shiki-light:#383A42;--shiki-dark:#E06C75"> [table_name_2]</span></span>
+<span class="line"><span style="--shiki-light:#A0A1A7;--shiki-light-font-style:italic;--shiki-dark:#7F848E;--shiki-dark-font-style:italic">-- 实例</span></span>
+<span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">INSERT INTO</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> another_table </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">SELECT</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> * </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">FROM</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> my_table </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">WHERE</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> age </span><span style="--shiki-light:#383A42;--shiki-dark:#56B6C2">></span><span style="--shiki-light:#986801;--shiki-dark:#D19A66"> 25</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF">;</span></span></code></pre>
+<div class="line-numbers" aria-hidden="true" style="counter-reset:line-number 0"><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div><div class="line-number"></div></div></div><h3 id="_4-2-update和delete" tabindex="-1"><a class="header-anchor" href="#_4-2-update和delete"><span>4.2 Update和Delete</span></a></h3>
+<p>ClickHouse提供了Delete和Update的能力，这类操作被称为Mutation查询，它可以看作Alter一种。</p>
+<p>虽然可以实现修改和删除，但是和一般的OLTP数据库不一样，<strong>Mutation语句是一种很重的操作，并且不支持事务</strong>。</p>
+<font color = 'blue'>
+"重"的原因主要是每次修改或者删除都要导致放弃目标数据的原有分区，重建新分区。所以尽量做批量的变更，不要进行频繁小数据的操作。
+</font>
+- 删除
+```
+alter table t_order_smt delete where sku_id = 'sku_001'
+```
+- 操作修改
+```
+alter table t_order_smt update total_amount=toDecimal32(2000.02, 2) where id = 102;
+```
+由于操作比较“重”，所以Mutation语句分两步执行，同步执行的部分其实只是进行新增数据新增分区和并把就分区打上逻辑上失效标记（**相当于生成一个临时分区，将老的分区重新写了一遍**）。直到触发分区合并的时候，才会删除旧数据释放磁盘空间，一般不会开放这样的功能给用户，由管理员完成。
+<ul>
+<li>查询操作
+<ul>
+<li>支持子查询</li>
+<li>支持CTE(Common Table Eepresion 公用表达式 with 子句)</li>
+<li>支持各种JOIN, 但是JOIN操作无法使用缓存，所以即便是两次相同得JOIN语句，ClickHouse也会视为两条新SQL</li>
+<li>窗口函数(官方正在测试中...)</li>
+<li>不支持自定义函数</li>
+<li>GROUP BY 操作增加了 with rollup \ with cube \ with total用来计算小计和总计
+假设维度是(a, b)
+<ul>
+<li>rollup：上卷
+<ul>
+<li>group by</li>
+<li>group by a</li>
+<li>group by a, b</li>
+</ul>
+</li>
+<li>cube: 多维卷积
+<ul>
+<li>group by a, b</li>
+<li>group by a</li>
+<li>group by b</li>
+<li>group by</li>
+</ul>
+</li>
+<li>total：总计
+<ul>
+<li>group by  a, b</li>
+<li>group by</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="_4-3-alter操作" tabindex="-1"><a class="header-anchor" href="#_4-3-alter操作"><span>4.3 alter操作</span></a></h3>
+<p>同MYSQL的修改字段基本一致</p>
+<ul>
+<li>新增字段</li>
+</ul>
+<div class="language-sql line-numbers-mode" data-highlighter="shiki" data-ext="sql" data-title="sql" style="--shiki-light:#383A42;--shiki-dark:#abb2bf;--shiki-light-bg:#FAFAFA;--shiki-dark-bg:#282c34"><pre v-pre class="shiki shiki-themes one-light one-dark-pro vp-code"><code><span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">alter</span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD"> table</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> tableName </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">add</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> column newcolname String </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">after</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> col1;</span></span></code></pre>
+<div class="line-numbers" aria-hidden="true" style="counter-reset:line-number 0"><div class="line-number"></div></div></div><ul>
+<li>修改字段类型</li>
+</ul>
+<div class="language-sql line-numbers-mode" data-highlighter="shiki" data-ext="sql" data-title="sql" style="--shiki-light:#383A42;--shiki-dark:#abb2bf;--shiki-light-bg:#FAFAFA;--shiki-dark-bg:#282c34"><pre v-pre class="shiki shiki-themes one-light one-dark-pro vp-code"><code><span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">alter</span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD"> table</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> tableName </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">modify</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> column newcolname String</span></span></code></pre>
+<div class="line-numbers" aria-hidden="true" style="counter-reset:line-number 0"><div class="line-number"></div></div></div><ul>
+<li>删除字段</li>
+</ul>
+<div class="language-sql line-numbers-mode" data-highlighter="shiki" data-ext="sql" data-title="sql" style="--shiki-light:#383A42;--shiki-dark:#abb2bf;--shiki-light-bg:#FAFAFA;--shiki-dark-bg:#282c34"><pre v-pre class="shiki shiki-themes one-light one-dark-pro vp-code"><code><span class="line"><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">alter</span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD"> table</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> tableName </span><span style="--shiki-light:#A626A4;--shiki-dark:#C678DD">drop</span><span style="--shiki-light:#383A42;--shiki-dark:#ABB2BF"> column newcolname;</span></span></code></pre>
+<div class="line-numbers" aria-hidden="true" style="counter-reset:line-number 0"><div class="line-number"></div></div></div><h2 id="_5-副本" tabindex="-1"><a class="header-anchor" href="#_5-副本"><span>5. 副本</span></a></h2>
+<p>副本的目的主要是保障数据的高可用性，即便一台ClickHouse节点宕机，那么也可以从其他服务器获得相同的数据。</p>
+<h3 id="_5-1-副本写入流程" tabindex="-1"><a class="header-anchor" href="#_5-1-副本写入流程"><span>5.1 副本写入流程</span></a></h3>
+<figure><img src="@source/data/ck/image/write-replica.png" alt="副本写入流程" tabindex="0" loading="lazy"><figcaption><strong>副本写入流程</strong></figcaption></figure>
+<p>ClickHouse 的 副本模式 确实没有传统数据库中严格意义上的 &quot;主从&quot; 概念，它采用了多主复制机制，所有副本在逻辑上是平等的。</p>
+<div class="hint-container tip">
+<p class="hint-container-title">无固定主从设计的优势和挑战</p>
+<ul>
+<li>优势
+<ul>
+<li>高可用性
+<ul>
+<li>任意副本都可以处理查询，单个节点故障不会影响整体服务。</li>
+<li>无需主从切换逻辑，减少复杂性。</li>
+</ul>
+</li>
+<li>负载均衡
+<ul>
+<li>查询可以分散到多个副本，提高读性能。</li>
+<li>所有副本都能参与分布式查询计划。</li>
+</ul>
+</li>
+<li>灵活性
+<ul>
+<li>任意副本可以动态加入或退出，不需要重新选举 &quot;主副本&quot;。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>挑战
+<ul>
+<li>写冲突</li>
+<li>一致性延迟</li>
+<li>运维复杂性</li>
+</ul>
+</li>
+</ul>
+</div>
+<h3 id="_5-2-配置步骤" tabindex="-1"><a class="header-anchor" href="#_5-2-配置步骤"><span>5.2 配置步骤</span></a></h3>
+<p>|文本|	打标人 (label)|	审核状态|	最终标签
+|天气很清凉|	小明，小张|	打标中|	|</p>
 </div></template>
 
 

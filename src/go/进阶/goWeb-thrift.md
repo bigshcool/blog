@@ -1,8 +1,7 @@
 ---
 # 这是文章的标题
-title: thrift
-# 你可以自定义封面图片
-cover: /assets/images/cover1.jpg
+title: Thrift
+
 # 这是页面的图标
 icon: file
 # 这是侧边栏的顺序
@@ -13,7 +12,8 @@ author: RUAN LONG
 date: 2024-10-23
 # 一个页面可以有多个分类
 category:
-  - JAVA
+  - GO
+  - Thrift
 # 一个页面可以有多个标签
 tag:
   - 基础
